@@ -3,12 +3,13 @@ import pandas as pd
 import mysql.connector
 import plotly.express as px
 import plotly.graph_objects as go
+from groq import Groq
 from plotly.subplots import make_subplots
 import numpy as np
 from datetime import datetime, timedelta
 import warnings
+from groq_utils import get_rag_response
 
-warnings.filterwarnings('ignore')
 
 # Page configuration
 st.set_page_config(
@@ -17,6 +18,88 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+
+GROQ_API_KEY = "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"
+client = Groq(api_key=GROQ_API_KEY)
+
+
+# def get_groq_response(messages, model="llama-3.3-70b-versatile"):
+#     response = client.chat.completions.create(
+#         messages=messages,
+#         model=model,
+#         temperature=0.5,
+#         max_tokens=1024,
+#         stream=False
+#     )
+#     return response.choices[0].message.content.strip()
+
+@st.cache_data
+def load_product_data():
+    try:
+        df = pd.read_csv("product_data.csv")
+        return df
+    except Exception as e:
+        st.warning(f"Erreur de chargement des données: {e}")
+        return pd.DataFrame()
+
+df = load_product_data()
+
+def get_data_summary(df):
+    if df.empty:
+        return "Pas de données disponibles."
+
+    summary = f"""
+Voici un résumé des données produits:
+
+- Nombre total de produits : {len(df)}
+- Vendeurs uniques : {df['vendor'].nunique()}
+- Types de produits : {df['product_type'].nunique()}
+- Prix moyen : ${df['price'].mean():.2f}
+- Stock moyen : {df['available'].mean():.1f} unités
+- Produits en stock critique (≤2) : {len(df[df['available'] <= 2])}
+- Produits avec remise : {len(df[df['discount_percentage'] > 0])}
+- Remise moyenne : {df[df['discount_percentage'] > 0]['discount_percentage'].mean():.1f}%
+"""
+
+    return summary
+
+# def get_groq_response(messages, model="llama-3.3-70b-versatile"):
+#     data_context = get_data_summary(df)  # Use the global df
+#     system_prompt = f"""
+# Tu es un assistant e-commerce intelligent.
+#
+# Voici le contexte des données produits disponibles :
+# {data_context}
+#
+# Instructions :
+# - Réponds en français
+# - Utilise les données fournies pour donner des réponses précises
+# - Donne des recommandations actionnables
+# - Utilise des emojis pour plus de clarté
+# """
+#
+#     # Insert system prompt at the beginning
+#     full_messages = [{"role": "system", "content": system_prompt}] + messages
+#
+#     try:
+#         response = client.chat.completions.create(
+#             messages=full_messages,
+#             model=model,
+#             temperature=0.5,
+#             max_tokens=1500,
+#             stream=False
+#         )
+#         return response.choices[0].message.content.strip()
+#     except Exception as e:
+#         return f"❌ Erreur lors de l'appel à Groq : {str(e)}"
+
+def get_groq_response(messages):
+    user_prompt = messages[-1]["content"]
+    return get_rag_response(user_prompt)
+
+warnings.filterwarnings('ignore')
+
 
 # Custom CSS for better styling
 st.markdown("""
@@ -231,12 +314,11 @@ if df.empty:
 
     st.stop()
 
-# Sidebar Navigation
 st.sidebar.markdown("## 🧭 Navigation")
 page = st.sidebar.selectbox(
     "Choose a section:",
     ["🏠 Overview", "📊 Product Insights", "📦 Stock Analysis",
-     "💰 Price Dynamics", "🏪 Vendor Comparison", "🔍 Advanced Filters", "📥 Export & Download"]
+         "💰 Price Dynamics", "🏪 Vendor Comparison", "🔍 Advanced Filters", "📥 Export & Download", "🤖 AI Assistant"]
 )
 
 # Sidebar Filters (Global) with better defaults
@@ -366,6 +448,29 @@ if page == "🏠 Overview":
             st.plotly_chart(fig_price, use_container_width=True)
         else:
             st.info("No data available for price categories")
+
+elif page == "🤖 AI Assistant":
+    st.markdown('<h1 class="main-header">🤖 AI Assistant</h1>', unsafe_allow_html=True)
+
+    if "messages" not in st.session_state:
+        st.session_state["messages"] = [{"role": "assistant",
+                                         "content": "Bonjour ! Je suis votre assistant intelligent en eCommerce. Comment puis-je vous aider ?"}]
+
+    for message in st.session_state["messages"]:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+    if prompt := st.chat_input("Posez une question sur les données ou demandez des recommandations."):
+        st.session_state["messages"].append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
+
+        with st.spinner("💬 Réflexion en cours..."):
+            response = get_groq_response(st.session_state["messages"])
+            st.session_state["messages"].append({"role": "assistant", "content": response})
+
+        with st.chat_message("assistant"):
+            st.markdown(response)
 
 elif page == "📦 Stock Analysis":
     st.markdown('<h1 class="main-header">📦 Stock Analysis</h1>', unsafe_allow_html=True)
