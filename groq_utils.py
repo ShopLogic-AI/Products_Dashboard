@@ -1,11 +1,12 @@
-# groq_utils.py
+# groq_utils.py - Complete version with both RAG and MCP integration
 from llama_index.core import Document, VectorStoreIndex
 from groq import Groq
 import pandas as pd
 import numpy as np
 
-# Keep a global variable to reuse the engine
+# Global variables to reuse engines
 query_engine = None
+mcp_host = None
 
 
 def load_product_data(csv_path="product_data.csv"):
@@ -150,3 +151,68 @@ def build_query_engine_custom(documents):
     # Create index and query engine
     index = VectorStoreIndex.from_documents(documents)
     return index.as_query_engine()
+
+
+# =============================================================================
+# MCP INTEGRATION
+# =============================================================================
+
+def initialize_mcp(groq_api_key="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"):
+    """Initialize MCP Host with Groq API key"""
+    global mcp_host
+    if mcp_host is None:
+        try:
+            from mcp_tools import MCPHost
+            mcp_host = MCPHost(groq_api_key)
+        except ImportError:
+            print("Warning: mcp_tools.py not found. MCP features disabled.")
+            mcp_host = None
+    return mcp_host
+
+
+def get_groq_response(messages, use_mcp=True):
+    """Get response using MCP architecture or fallback to RAG"""
+    global mcp_host
+
+    if use_mcp:
+        # Try MCP first
+        try:
+            if mcp_host is None:
+                mcp_host = initialize_mcp()
+
+            if mcp_host is not None:
+                # Extract the latest user message
+                if messages and len(messages) > 0:
+                    latest_message = messages[-1]["content"]
+
+                    # Convert messages to conversation history (exclude latest)
+                    conversation_history = []
+                    for msg in messages[:-1]:
+                        conversation_history.append({
+                            "role": msg["role"],
+                            "content": msg["content"]
+                        })
+
+                    # Process through MCP
+                    response = mcp_host.process_query(latest_message, conversation_history)
+                    return response
+        except Exception as e:
+            print(f"MCP Error: {e}. Falling back to RAG.")
+
+    # Fallback to RAG approach
+    if messages and len(messages) > 0:
+        latest_message = messages[-1]["content"]
+        return get_rag_response(latest_message)
+
+    return "Aucune question reçue."
+
+
+# Legacy function maintaining compatibility
+def get_mcp_response(messages):
+    """Explicit MCP response function"""
+    return get_groq_response(messages, use_mcp=True)
+
+
+def get_traditional_rag_response(messages):
+    """Explicit RAG response function"""
+    return get_groq_response(messages, use_mcp=False)

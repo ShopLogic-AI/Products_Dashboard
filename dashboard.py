@@ -449,28 +449,127 @@ if page == "🏠 Overview":
         else:
             st.info("No data available for price categories")
 
+# elif page == "🤖 AI Assistant":
+#     st.markdown('<h1 class="main-header">🤖 AI Assistant</h1>', unsafe_allow_html=True)
+#
+#     if "messages" not in st.session_state:
+#         st.session_state["messages"] = [{"role": "assistant",
+#                                          "content": "Bonjour ! Je suis votre assistant intelligent en eCommerce. Comment puis-je vous aider ?"}]
+#
+#     for message in st.session_state["messages"]:
+#         with st.chat_message(message["role"]):
+#             st.markdown(message["content"])
+#
+#     if prompt := st.chat_input("Posez une question sur les données ou demandez des recommandations."):
+#         st.session_state["messages"].append({"role": "user", "content": prompt})
+#         with st.chat_message("user"):
+#             st.markdown(prompt)
+#
+#         with st.spinner("💬 Réflexion en cours..."):
+#             response = get_groq_response(st.session_state["messages"])
+#             st.session_state["messages"].append({"role": "assistant", "content": response})
+#
+#         with st.chat_message("assistant"):
+#             st.markdown(response)
+
 elif page == "🤖 AI Assistant":
-    st.markdown('<h1 class="main-header">🤖 AI Assistant</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 class="main-header">🤖 AI Assistant (MCP Architecture)</h1>', unsafe_allow_html=True)
 
+    # MCP Architecture Info
+    with st.expander("ℹ️ Architecture MCP", expanded=False):
+        st.markdown("""
+        **Architecture Model Context Protocol (MCP):**
+        - 🏠 **MCP Host**: Interface Streamlit avec authentification et logs
+        - 🤖 **MCP Client**: Wrapper LLM qui structure les prompts pour Groq
+        - 🔒 **MCP Server**: Couche sécurisée qui filtre les données sensibles
+        - 📊 **Isolation des données**: Seuls les résumés KPI sont partagés avec l'IA
+        - 📝 **Audit**: Toutes les interactions sont loggées dans `mcp_log.txt`
+        """)
+
+    # Initialize chat history
     if "messages" not in st.session_state:
-        st.session_state["messages"] = [{"role": "assistant",
-                                         "content": "Bonjour ! Je suis votre assistant intelligent en eCommerce. Comment puis-je vous aider ?"}]
+        st.session_state["messages"] = [{
+            "role": "assistant",
+            "content": "Bonjour ! Je suis votre assistant intelligent eCommerce avec architecture MCP sécurisée. Comment puis-je vous aider à analyser vos données produits ?"
+        }]
 
+    # Display chat messages
     for message in st.session_state["messages"]:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
-    if prompt := st.chat_input("Posez une question sur les données ou demandez des recommandations."):
+    # Chat input
+    if prompt := st.chat_input("Posez une question sur les données ou demandez des recommandations..."):
+        # Add user message
         st.session_state["messages"].append({"role": "user", "content": prompt})
         with st.chat_message("user"):
             st.markdown(prompt)
 
-        with st.spinner("💬 Réflexion en cours..."):
-            response = get_groq_response(st.session_state["messages"])
-            st.session_state["messages"].append({"role": "assistant", "content": response})
+        # Get AI response through MCP architecture
+        with st.spinner("🔒 Traitement sécurisé via MCP..."):
+            try:
+                # Import here to avoid circular imports
+                from groq_utils import get_groq_response
 
+                response = get_groq_response(st.session_state["messages"])
+                st.session_state["messages"].append({"role": "assistant", "content": response})
+            except Exception as e:
+                error_msg = f"Erreur MCP: {str(e)}"
+                st.session_state["messages"].append({"role": "assistant", "content": error_msg})
+                response = error_msg
+
+        # Display assistant response
         with st.chat_message("assistant"):
             st.markdown(response)
+
+    # Quick action buttons
+    st.markdown("### 🚀 Actions Rapides")
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        if st.button("📊 KPI Généraux"):
+            quick_prompt = "Donne-moi un résumé des KPI principaux de mon eCommerce"
+            st.session_state["messages"].append({"role": "user", "content": quick_prompt})
+            with st.spinner("Analyse en cours..."):
+                from groq_utils import get_groq_response
+
+                response = get_groq_response(st.session_state["messages"])
+                st.session_state["messages"].append({"role": "assistant", "content": response})
+            st.rerun()
+
+    with col2:
+        if st.button("⚠️ Produits Critiques"):
+            quick_prompt = "Quels sont les produits critiques avec un stock inférieur à 2 et une remise supérieure à 20% ?"
+            st.session_state["messages"].append({"role": "user", "content": quick_prompt})
+            with st.spinner("Analyse en cours..."):
+                from groq_utils import get_groq_response
+
+                response = get_groq_response(st.session_state["messages"])
+                st.session_state["messages"].append({"role": "assistant", "content": response})
+            st.rerun()
+
+    with col3:
+        if st.button("🏪 Analyse Vendeurs"):
+            quick_prompt = "Donne-moi une analyse des performances par vendeur"
+            st.session_state["messages"].append({"role": "user", "content": quick_prompt})
+            with st.spinner("Analyse en cours..."):
+                from groq_utils import get_groq_response
+
+                response = get_groq_response(st.session_state["messages"])
+                st.session_state["messages"].append({"role": "assistant", "content": response})
+            st.rerun()
+
+    # Clear chat button
+    if st.button("🗑️ Vider l'historique"):
+        st.session_state["messages"] = [{
+            "role": "assistant",
+            "content": "Historique vidé. Comment puis-je vous aider ?"
+        }]
+        st.rerun()
+
+    # Show logs info
+    st.markdown("---")
+    st.info("📝 Toutes les interactions sont enregistrées dans `mcp_log.txt` pour audit et conformité.")
 
 elif page == "📦 Stock Analysis":
     st.markdown('<h1 class="main-header">📦 Stock Analysis</h1>', unsafe_allow_html=True)
